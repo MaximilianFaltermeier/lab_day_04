@@ -38,7 +38,7 @@ def nlms4echokomp(x, g, noise, alpha, mh):
     for index in range(mg, lx):
         # Extract the last mg values(including the current value) from the
         # input speech signal x, where x(i) represents the current value.
-        x_block = x[lx - mg:]
+        x_block = x[k:index]
 
         # Filtering the input speech signal using room impulse response and adaptive filter. Please note that you don't
         # need to implement the complete filtering here. A simple vector manipulation would be enough here
@@ -50,10 +50,11 @@ def nlms4echokomp(x, g, noise, alpha, mh):
 
         # Updating the filter
         beta = alpha / np.dot(x_hat, x_hat)
-        h = h + noise[k] * x_hat[k] * beta
+        s_hat = err[k]+noise[k]+x_block[:mh]
+        h = h + noise[k] * x_block[:mh] * beta
         # Calculating the relative system distance
-        d = g - h
-        s_diff[k] = np.dot(d, d) / np.dot(g, g)
+        d = g[:mh] - h
+        s_diff[k] = np.dot(d, d) / np.dot(g[:mh], g[:mh])
 
         k = k + 1  # time index
 
@@ -64,7 +65,7 @@ def nlms4echokomp(x, g, noise, alpha, mh):
 
 
 # switch between exercises
-exercise = 5  # choose between 1-7
+exercise = 7  # choose between 1-7
 
 f = np.load('echocomp.npz')
 g = [f['g1'], f['g2'], f['g3']]
@@ -93,35 +94,51 @@ if exercise == 2:
 
     x[0] = s  # Speech signal
     # white noise
-    x[1] = np.random.normal(0, np.sqrt(0.16), size=22000)  # white noise
+    x[1] = signal.windows.gaussian(ls, 0.16)  # white noise
     x[2] = signal.lfilter([1], [1, -0.5], x[1])  # colorful noise
+    g = [g[0], g[0], g[0]]
     leg = ('Speech', 'white noise', 'colorful noise')
     title = 'Different Input Signals'
 elif exercise == 3:
-    noise[0] = np.random.normal(0, 0, size=22000)
-    noise[1] = np.random.normal(0, np.sqrt(0.001), size=22000)
-    noise[2] = np.random.normal(0, np.sqrt(0.01), size=22000)
+    noise[0] = np.random.normal(0, 0, size=ls)
+    noise[1] = np.random.normal(0, np.sqrt(0.001), size=ls)
+    noise[2] = np.random.normal(0, np.sqrt(0.01), size=ls)
+    g = [g[0], g[0], g[0]]
+    leg = ('var = 0', 'var = 0.001', 'var = 0.01')
+    title = 'Input Signals (white noise) with different white background noise'
+elif exercise == 4:
+    x[0] = s  # Speech signal
+    x[1] = s  # Speech signal
+    x[2] = s  # Speech signal
+    noise[0] = np.random.normal(0, 0, size=ls)
+    noise[1] = np.random.normal(0, np.sqrt(0.001), size=ls)
+    noise[2] = np.random.normal(0, np.sqrt(0.01), size=ls)
+    g = [g[0], g[0], g[0]]
     leg = ('var = 0', 'var = 0.001', 'var = 0.01')
     title = 'Input Signals with different white background noise'
-elif exercise == 4:
-    # todo your code
-    pass
 
 elif exercise == 5:
     alphas = [0.1, 0.5, 1.0]
     noise[0] = np.random.normal(0, np.sqrt(0.01), size=22000)
     noise[1] = np.random.normal(0, np.sqrt(0.01), size=22000)
     noise[2] = np.random.normal(0, np.sqrt(0.01), size=22000)
+    g = [g[0], g[0], g[0]]
     leg = ('alpha = 0.1', 'alpha = 0.5', 'alpha = 1')
     title = 'variation of the stepsize alpha'
 elif exercise == 6:
-    # todo your code
-    pass
+    noise[0] = np.random.normal(0, np.sqrt(0.01), size=22000)
+    noise[1] = np.random.normal(0, np.sqrt(0.01), size=22000)
+    noise[2] = np.random.normal(0, np.sqrt(0.01), size=22000)
+    mh = [len(g[0]) - 10, len(g[0]) - 30, len(g[0]) - 60]
+    g = [g[0], g[0], g[0]]
+    leg = ('mh = mg-10', 'mh = mg-30', 'mh = mg-60')
+    title = 'Influence of the compensation filter length'
 
 elif exercise == 7:
-    # todo your code
-    pass
-
+    noise = [np.zeros(ls, ) for i in range(vn)]  # no noise
+    mh = [len(g[0]), len(g[1]), len(g[2])]
+    leg = ('g0', 'g1', 'g2')
+    title = 'three different room impulse responses g'
 # There should be appropriate legends and axis labels in each figure!
 if exercise == 1:
     s_diff, e, x_h, x_t = nlms4echokomp(n0, g[0], np.zeros(ls), alpha, 200)
@@ -143,8 +160,7 @@ else:
         # 3 system distances with different parameters are calculated here
         # The input variables of 'nlms4echokomp' must be adapted according
         # to different exercises.
-        # TODO: g[0] -> g[i] fix problem of length
-        s_diff, e, x_h, x_t = nlms4echokomp(x[i], g[0], noise[i], alphas[i], mh[i])
+        s_diff, e, x_h, x_t = nlms4echokomp(x[i], g[i], noise[i], alphas[i], mh[i])
         plt.plot(s_diff, label=leg[i])
 
     plt.title('Exercise ' + str(exercise) + ': ' + title)
