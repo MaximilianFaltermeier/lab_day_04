@@ -45,8 +45,8 @@ def nlms4echokomp(x, g, noise, alpha, mh):
         # Filtering the input speech signal using room impulse response and adaptive filter. Please note that you don't
         # need to implement the complete filtering here. A simple vector manipulation would be enough here
         # todo your code:
-        x_tilde[k] = np.dot(g.T, x_block)
-        x_hat[k] = np.dot(h.T, x_block)
+        x_tilde[k] = np.dot(g.T, x_block) + noise[k]
+        x_hat[k] = np.dot(h.T, x_block[:mh])
 
         # Calculating the estimated error signal
         # todo your code
@@ -54,11 +54,11 @@ def nlms4echokomp(x, g, noise, alpha, mh):
 
         # Updating the filter
         # todo your code
-        if np.dot(x_block.T, x_block) != 0:
-            h = h + x_block * err[k] * alpha / np.dot(x_block.T, x_block)
+        if np.dot(x_block.T[:mh], x_block[:mh]) != 0:
+            h = h + x_block[:mh] * err[k] * alpha / np.dot(x_block[:mh].T, x_block[:mh])
         # Calculating the relative system distance
         # todo your code
-        s_diff[k] = np.dot((g - h).T, g - h) / np.dot(g.T, g)
+        s_diff[k] = np.dot((g[:mh] - h).T, g[:mh] - h) / np.dot(g[:mh].T, g[:mh])
 
         if k > 199:
             if np.mean(x_tilde[k - 200:k] ** 2) !=0 and np.mean((x_tilde[k - 200:k] - x_hat[k - 200:k]) ** 2) != 0:
@@ -75,7 +75,7 @@ def nlms4echokomp(x, g, noise, alpha, mh):
 
 
 # switch between exercises
-exercise = 3  # choose between 1-7
+exercise = 1  # choose between 1-7
 
 f = np.load('echocomp.npz')
 g = [f['g1'], f['g2'], f['g3']]
@@ -90,8 +90,8 @@ s = s / np.sqrt(s.T.dot(s)) * np.sqrt(n0.T.dot(n0))  # Number of curves in each 
 vn = 3  # number of curves
 noise = [np.zeros(ls, ) for i in range(vn)]  # no disturbance by noise
 alphas = [alpha for i in range(vn)]  # Step size factor for different exercises
-#mh = len(g[0]) * np.ones(vn, dtype=int)  # Length of the compensation filter
-mh = [len(g[0]), len(g[1]), len(g[2])]  # Length of the compensation
+mh = len(g[0]) * np.ones(vn, dtype=int)  # Length of the compensation filter
+#mh = [len(g[0]), len(g[1]), len(g[2])]  # Length of the compensation
 x = [n0.copy() for i in range(vn)]  # white noise as input signal
 
 # In the following part, the matrices and vectors must be adjusted to
@@ -111,17 +111,20 @@ if exercise == 2:
     a = [1, -0.5]
     x[2] = signal.lfilter(b, a, x[1])
 
+    g = [g[0], g[0], g[0]]
+
     leg = ('Speech', 'white noise', 'colorful noise')
-    title = 'Different Input Signals'
+    title = 'Influence of input signals with g=g0 and noise=false'
 elif exercise == 3:
     x[0] = n0  # white noise
     x[1] = n0  # white noise
     x[2] = n0  # white noise
-    noise[0] = np.sqrt(0.) * np.random.randn(ls, )  # white noise
-    noise[1] = np.sqrt(0.001) * np.random.randn(ls, )
-    noise[2] = np.sqrt(0.01) * np.random.randn(ls, )
+    noise[0] = np.sqrt(0.) * np.random.randn(ls)  # white noise
+    noise[1] = np.sqrt(0.001) * np.random.randn(ls)
+    noise[2] = np.sqrt(0.01) * np.random.randn(ls)
+    g = [g[0], g[0], g[0]]
     leg = ('n[0] = 0', 'n[1] = 0.001', 'n[2] = 0.01')
-    title = 'Different noises n with x=n0'
+    title = 'Influence of noises with x=n0, g=g0'
     pass
 elif exercise == 4:
     x[0] = s  # Speech signal
@@ -130,27 +133,47 @@ elif exercise == 4:
     noise[0] = np.sqrt(0.) * np.random.randn(ls)  # white noise
     noise[1] = np.sqrt(0.001) * np.random.randn(ls)
     noise[2] = np.sqrt(0.01) * np.random.randn(ls)
+    g = [g[0], g[0], g[0]]
     leg = ('n[0] = 0', 'n[1] = 0.001', 'n[2] = 0.01')
-    title = 'Different noises n with x=s'
+    title = 'Influence of noises on speech signal x=s, g=g0 and noise=true'
     pass
 
 elif exercise == 5:
-    # todo your code
+    x[0] = n0  # White noise
+    x[1] = n0
+    x[2] = n0
     noise[0] = np.sqrt(0.01) * np.random.randn(ls) # white noise
     noise[1] = np.sqrt(0.01) * np.random.randn(ls)
     noise[2] = np.sqrt(0.01) * np.random.randn(ls)
+    g = [g[0], g[0], g[0]]
     alphas = [0.1, 0.5, 1.0]
     leg = ('alpha = 0.1', 'alpha = 0.5', 'alpha = 1.0')
-    title = 'Different stepsizes alpha'
+    title = 'Influence of stepsizes alpha with x=s, g=g0 and noise=true'
     pass
 
 elif exercise == 6:
-    mh = [len(g[0])-10, len(g[1])-30, len(g[2])-60]
-    # todo your code
+    x[0] = n0  # White noise
+    x[1] = n0
+    x[2] = n0
+    noise[0] = np.sqrt(0.01) * np.random.randn(ls) # white noise
+    noise[1] = np.sqrt(0.01) * np.random.randn(ls)
+    noise[2] = np.sqrt(0.01) * np.random.randn(ls)
+    mh = [len(g[0])-10, len(g[0])-30, len(g[0])-60]
+    g = [g[0], g[0], g[0]]
+    leg = ('mh = mg-10', 'mh = mg-30', 'mh = mg-60')
+    title = 'Influence of mh'
     pass
 
 elif exercise == 7:
-    # todo your code
+    x[0] = n0  # White noise
+    x[1] = n0
+    x[2] = n0
+    noise = [np.zeros(ls, ) for i in range(vn)]  # no disturbance by noise
+
+    g = [g[0], g[1], g[2]]
+    mh = [len(g[0]), len(g[1]), len(g[2])]
+    leg = ('g[0]', 'g[1]', 'g[2]')
+    title = 'Influence of different lengths g with x=n0 and Noise=false'
     pass
 # There should be appropriate legends and axis labels in each figure!
 if exercise == 1:
@@ -199,3 +222,4 @@ else:
     plt.grid(True)
     plt.legend()
     plt.show()
+
